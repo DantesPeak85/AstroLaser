@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@200..800&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Assistant", sans-serif;
+    font-weight: 500;
+    background-color: #1a1a2e;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header */
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #e8e8e8;
+}
+
+.header .status {
+    font-size: 0.8rem;
+    color: #a0c4ff;
+}
+
+/* Map Container */
+#map {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+}
+
+/* Info Panel */
+.info-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #16213e, #1a1a3e);
+    border-top: 2px solid #0f3460;
+    border-radius: 16px 16px 0 0;
+    padding: 16px 20px;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease;
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.info-panel.hidden {
+    transform: translateY(calc(100% - 40px));
+}
+
+.info-panel .drag-handle {
+    width: 40px;
+    height: 4px;
+    background: #4a5568;
+    border-radius: 2px;
+    margin: 0 auto 12px;
+    cursor: pointer;
+}
+
+.info-panel h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #7ec8e3;
+    margin-bottom: 4px;
+}
+
+.info-panel .shelter-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.info-panel .shelter-desc {
+    font-size: 0.85rem;
+    color: #b0b0c0;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.info-panel .stats {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+}
+
+.info-panel .stat {
+    text-align: center;
+}
+
+.info-panel .stat-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #7ec8e3;
+}
+
+.info-panel .stat-label {
+    font-size: 0.75rem;
+    color: #8888a0;
+}
+
+.info-panel .nav-btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #0466c8, #0353a4);
+    color: #fff;
+    text-decoration: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-family: "Assistant", sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.info-panel .nav-btn:hover {
+    background: linear-gradient(135deg, #0353a4, #023e7d);
+}
+
+.info-panel .loading-msg {
+    color: #a0c4ff;
+    font-size: 0.95rem;
+}
+
+.info-panel .error-msg {
+    color: #ff6b6b;
+    font-size: 0.9rem;
+}
+
+/* Shelter Markers */
+.shelter-marker {
+    width: 32px;
+    height: 32px;
+    background: #0466c8;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s;
+}
+
+.shelter-marker.nearest {
+    background: #2dc653;
+    border-color: #fff;
+    animation: pulse-marker 1.5s ease-in-out infinite;
+    transform: scale(1.15);
+    z-index: 10;
+}
+
+@keyframes pulse-marker {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(45, 198, 83, 0.6); }
+    50% { box-shadow: 0 0 0 12px rgba(45, 198, 83, 0); }
+}
+
+/* User Location Dot */
+.user-dot {
+    width: 16px;
+    height: 16px;
+    background: #4285f4;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.5);
+    animation: pulse-user 2s ease-in-out infinite;
+}
+
+@keyframes pulse-user {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.5); }
+    50% { box-shadow: 0 0 0 16px rgba(66, 133, 244, 0); }
+}
+
+/* Leaflet Popup Styling */
+.leaflet-popup-content-wrapper {
+    border-radius: 10px;
+    font-family: "Assistant", sans-serif;
+    direction: rtl;
+}
+
+.leaflet-popup-content {
+    margin: 10px 14px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #333;
+}
+
+.leaflet-popup-content strong {
+    font-size: 1rem;
+    color: #0f3460;
+}
+
+.leaflet-popup-content .popup-desc {
+    color: #555;
+    margin-top: 4px;
+}
+
+.leaflet-popup-content .popup-nav-link {
+    display: inline-block;
+    margin-top: 8px;
+    background: #0466c8;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+/* Marching ants animation for route */
+.route-line {
+    animation: march 1s linear infinite;
+}
+
+@keyframes march {
+    to { stroke-dashoffset: -20; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .header h1 {
+        font-size: 1rem;
+    }
+    .info-panel {
+        padding: 12px 16px;
+    }
+    .info-panel .stats {
+        gap: 14px;
+    }
+}

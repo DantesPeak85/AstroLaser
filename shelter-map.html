@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>מפת מקלטים ציבוריים - בת חפר</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="shelter-style.css">
+</head>
+<body>
+
+<header class="header">
+    <h1>🛡️ מפת מקלטים - בת חפר</h1>
+    <span class="status" id="statusText">מאתר מיקום...</span>
+</header>
+
+<div id="map"></div>
+
+<div class="info-panel" id="infoPanel">
+    <div class="drag-handle" id="dragHandle"></div>
+    <div id="panelContent">
+        <p class="loading-msg">📍 מאתר את המיקום שלך...</p>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// =============================================
+// Shelter Data - Bat Hefer Public Shelters
+// =============================================
+const SHELTERS = [
+    {
+        id: 1,
+        name: "מרכז מסחרי",
+        lat: 32.35377,
+        lng: 34.90595,
+        description: "קומת קרקע: מתחת למדרגות ליד המעליות, וחנות ריקה צמודה לפיצריה. קומה ראשונה: מול קופת חולים."
+    },
+    {
+        id: 2,
+        name: "בית הספר",
+        lat: 32.35258,
+        lng: 34.90532,
+        description: "מיד לאחר הכניסה הראשית – בבניינים מימין ומשמאל."
+    },
+    {
+        id: 3,
+        name: "הבועה (הבית הקהילתי)",
+        lat: 32.35485,
+        lng: 34.90407,
+        description: "מיגונית צמודה מבחוץ, ליד הגדר – על השביל היורד למגרש הכדורגל."
+    },
+    {
+        id: 4,
+        name: "מרכז קהילתי / מתנ\"ס",
+        lat: 32.35435,
+        lng: 34.90325,
+        description: "באולם הרב-תכליתי (עם הבמה) – המסדרון מאחורי הקלעים. וגם באזור ההנהלה – אחרי דלת הזכוכית, החדר השני משמאל."
+    },
+    {
+        id: 5,
+        name: "מרכז הנוער",
+        lat: 32.35340,
+        lng: 34.90380,
+        description: "בכניסה למתחם – במבנה שמימין."
+    },
+    {
+        id: 6,
+        name: "בית הכנסת",
+        lat: 32.35310,
+        lng: 34.90660,
+        description: "החדר של הרב."
+    },
+    {
+        id: 7,
+        name: "ספריה",
+        lat: 32.35415,
+        lng: 34.90480,
+        description: "בתוך המתחם, פתוח רק בשעות הפעילות."
+    },
+    {
+        id: 8,
+        name: "מועדון גימלאים",
+        lat: 32.35460,
+        lng: 34.90550,
+        description: "בתוך המבנה, פתוח רק בשעות הפעילות."
+    }
+];
+
+// =============================================
+// Map Initialization
+// =============================================
+const BAT_HEFER_CENTER = [32.3540, 34.9050];
+
+const map = L.map('map', {
+    zoomControl: false
+}).setView(BAT_HEFER_CENTER, 16);
+
+// Add zoom control to top-left
+L.control.zoom({ position: 'topleft' }).addTo(map);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+}).addTo(map);
+
+// =============================================
+// Shelter Markers
+// =============================================
+const shelterMarkers = [];
+let nearestShelterId = null;
+
+function createShelterIcon(isNearest) {
+    return L.divIcon({
+        className: '',
+        html: `<div class="shelter-marker ${isNearest ? 'nearest' : ''}">מ</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -20]
+    });
+}
+
+function addShelterMarkers() {
+    SHELTERS.forEach(shelter => {
+        const marker = L.marker([shelter.lat, shelter.lng], {
+            icon: createShelterIcon(false)
+        }).addTo(map);
+
+        const popupHtml = `
+            <strong>${shelter.name}</strong>
+            <div class="popup-desc">${shelter.description}</div>
+            <a class="popup-nav-link" href="https://www.google.com/maps/dir/?api=1&destination=${shelter.lat},${shelter.lng}&travelmode=walking" target="_blank" rel="noopener">
+                🧭 נווט ב-Google Maps
+            </a>
+        `;
+        marker.bindPopup(popupHtml);
+
+        shelterMarkers.push({ shelter, marker });
+    });
+}
+
+function updateNearestMarker(nearestId) {
+    shelterMarkers.forEach(({ shelter, marker }) => {
+        marker.setIcon(createShelterIcon(shelter.id === nearestId));
+    });
+    nearestShelterId = nearestId;
+}
+
+addShelterMarkers();
+
+// =============================================
+// User Location
+// =============================================
+let userMarker = null;
+let routeLine = null;
+let userLatLng = null;
+
+function createUserIcon() {
+    return L.divIcon({
+        className: '',
+        html: '<div class="user-dot"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+}
+
+// =============================================
+// Distance Calculation (Haversine)
+// =============================================
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestShelter(lat, lng) {
+    let nearest = null;
+    let minDist = Infinity;
+
+    SHELTERS.forEach(shelter => {
+        const dist = haversineDistance(lat, lng, shelter.lat, shelter.lng);
+        if (dist < minDist) {
+            minDist = dist;
+            nearest = shelter;
+        }
+    });
+
+    return { shelter: nearest, distance: minDist };
+}
+
+// =============================================
+// Route Line
+// =============================================
+function updateRouteLine(fromLatLng, toLatLng) {
+    if (routeLine) {
+        map.removeLayer(routeLine);
+    }
+    routeLine = L.polyline([fromLatLng, toLatLng], {
+        color: '#2dc653',
+        weight: 4,
+        dashArray: '10, 10',
+        className: 'route-line'
+    }).addTo(map);
+}
+
+// =============================================
+// Info Panel
+// =============================================
+const panelContent = document.getElementById('panelContent');
+const statusText = document.getElementById('statusText');
+const dragHandle = document.getElementById('dragHandle');
+const infoPanel = document.getElementById('infoPanel');
+
+let panelCollapsed = false;
+dragHandle.addEventListener('click', () => {
+    panelCollapsed = !panelCollapsed;
+    infoPanel.classList.toggle('hidden', panelCollapsed);
+});
+
+function updateInfoPanel(shelter, distance) {
+    const distText = distance < 1000
+        ? `${Math.round(distance)} מטרים`
+        : `${(distance / 1000).toFixed(1)} ק"מ`;
+
+    const walkMinutes = Math.max(1, Math.round(distance / 80));
+
+    panelContent.innerHTML = `
+        <h2>המקלט הקרוב אליך</h2>
+        <div class="shelter-name">${shelter.name}</div>
+        <div class="shelter-desc">${shelter.description}</div>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">${distText}</div>
+                <div class="stat-label">מרחק</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">~${walkMinutes} דק׳</div>
+                <div class="stat-label">הליכה</div>
+            </div>
+        </div>
+        <a class="nav-btn" href="https://www.google.com/maps/dir/?api=1&destination=${shelter.lat},${shelter.lng}&travelmode=walking" target="_blank" rel="noopener">
+            🧭 נווט ב-Google Maps
+        </a>
+    `;
+}
+
+function showError(msg) {
+    panelContent.innerHTML = `<p class="error-msg">${msg}</p>`;
+    statusText.textContent = 'מיקום לא זמין';
+}
+
+// =============================================
+// Geolocation
+// =============================================
+function onLocationFound(position) {
+    const { latitude, longitude, accuracy } = position.coords;
+    userLatLng = [latitude, longitude];
+
+    // Update or create user marker
+    if (userMarker) {
+        userMarker.setLatLng(userLatLng);
+    } else {
+        userMarker = L.marker(userLatLng, { icon: createUserIcon(), zIndex: 1000 }).addTo(map);
+        // First fix: pan to show user and shelters
+        const allPoints = SHELTERS.map(s => [s.lat, s.lng]);
+        allPoints.push(userLatLng);
+        map.fitBounds(L.latLngBounds(allPoints).pad(0.1));
+    }
+
+    // Find nearest shelter
+    const { shelter, distance } = findNearestShelter(latitude, longitude);
+
+    // Update markers, route, and panel
+    updateNearestMarker(shelter.id);
+    updateRouteLine(userLatLng, [shelter.lat, shelter.lng]);
+    updateInfoPanel(shelter, distance);
+
+    statusText.textContent = `מיקום פעיל (±${Math.round(accuracy)}מ)`;
+
+    // Warn if far from Bat Hefer
+    const distToCenter = haversineDistance(latitude, longitude, BAT_HEFER_CENTER[0], BAT_HEFER_CENTER[1]);
+    if (distToCenter > 2000) {
+        statusText.textContent = '⚠️ אתה רחוק מבת חפר';
+    }
+}
+
+function onLocationError(error) {
+    const messages = {
+        1: '🚫 לא ניתנה הרשאת מיקום. אנא אשרו גישה למיקום בהגדרות הדפדפן.',
+        2: '📡 מיקום לא זמין כרגע. נסו שוב מאוחר יותר.',
+        3: '⏱️ תם הזמן לקבלת מיקום. נסו שוב.'
+    };
+    showError(messages[error.code] || 'שגיאה בקבלת מיקום.');
+
+    // Still show shelters without user location
+    panelContent.innerHTML += `
+        <div style="margin-top: 12px;">
+            <h2>מקלטים ציבוריים בבת חפר</h2>
+            <div class="shelter-desc">
+                ${SHELTERS.map(s => `<strong>${s.name}</strong>: ${s.description}`).join('<br><br>')}
+            </div>
+        </div>
+    `;
+}
+
+if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(onLocationFound, onLocationError, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+    });
+} else {
+    showError('הדפדפן שלך לא תומך באיתור מיקום.');
+}
+</script>
+
+</body>
+</html>
