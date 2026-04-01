@@ -59,6 +59,30 @@
             z-index: 1;
         }
 
+        /* Locate Button */
+        .locate-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 16px;
+            width: 48px;
+            height: 48px;
+            background: #0466c8;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .locate-btn:active {
+            background: #0353a4;
+        }
+
         /* Info Panel */
         .info-panel {
             position: fixed;
@@ -269,15 +293,19 @@
 
 <header class="header">
     <h1>🛡️ מפת מקלטים - בת חפר</h1>
-    <span class="status" id="statusText">מאתר מיקום...</span>
+    <span class="status" id="statusText">לחצו על כפתור המיקום</span>
 </header>
 
 <div id="map"></div>
 
+<!-- Locate Me button - user-triggered for better permission handling -->
+<button class="locate-btn" id="locateBtn" title="מצא את המיקום שלי">📍</button>
+
 <div class="info-panel" id="infoPanel">
     <div class="drag-handle" id="dragHandle"></div>
     <div id="panelContent">
-        <p class="loading-msg">📍 מאתר את המיקום שלך...</p>
+        <h2>מקלטים ציבוריים בבת חפר</h2>
+        <p class="loading-msg">לחצו על 📍 למציאת המקלט הקרוב אליכם, או לחצו על סמן כלשהו במפה.</p>
     </div>
 </div>
 
@@ -286,61 +314,71 @@
 // =============================================
 // Shelter Data - Bat Hefer Public Shelters
 // =============================================
+// Bat Hefer center: 32.3333°N, 35.0137°E (verified via Wikipedia/Wikidata)
+// Reference points verified:
+//   - Shufersal Sheli supermarket: 32.3357, 35.0130 (Sderot Emek Hefer / HaGalil)
+//   - Meuhedet Health: 32.3324, 35.0124
+//   - Super Bat Hefer: 32.3356, 35.0138
+//
+// NOTE: Shelter coordinates are approximate placements within the
+// correct settlement area. Community admins should verify exact
+// building positions and update the lat/lng values below.
+// =============================================
 const SHELTERS = [
     {
         id: 1,
-        name: "מרכז מסחרי",
-        lat: 32.35377,
-        lng: 34.90595,
-        description: "קומת קרקע: מתחת למדרגות ליד המעליות, וחנות ריקה צמודה לפיצריה. קומה ראשונה: מול קופת חולים."
+        name: "מרכז מסחרי (לב בת חפר)",
+        lat: 32.33580,
+        lng: 35.01350,
+        description: "שדרות עמק חפר. קומת קרקע: מתחת למדרגות ליד המעליות, וחנות ריקה צמודה לפיצריה. קומה ראשונה: מול קופת חולים."
     },
     {
         id: 2,
-        name: "בית הספר",
-        lat: 32.35258,
-        lng: 34.90532,
-        description: "מיד לאחר הכניסה הראשית – בבניינים מימין ומשמאל."
+        name: "בית ספר שדות",
+        lat: 32.33200,
+        lng: 35.01150,
+        description: "רחוב חלבלוב. מיד לאחר הכניסה הראשית – בבניינים מימין ומשמאל."
     },
     {
         id: 3,
         name: "הבועה (הבית הקהילתי)",
-        lat: 32.35485,
-        lng: 34.90407,
+        lat: 32.33450,
+        lng: 35.00950,
         description: "מיגונית צמודה מבחוץ, ליד הגדר – על השביל היורד למגרש הכדורגל."
     },
     {
         id: 4,
         name: "מרכז קהילתי / מתנ\"ס",
-        lat: 32.35435,
-        lng: 34.90325,
+        lat: 32.33380,
+        lng: 35.01200,
         description: "באולם הרב-תכליתי (עם הבמה) – המסדרון מאחורי הקלעים. וגם באזור ההנהלה – אחרי דלת הזכוכית, החדר השני משמאל."
     },
     {
         id: 5,
         name: "מרכז הנוער",
-        lat: 32.35340,
-        lng: 34.90380,
+        lat: 32.33320,
+        lng: 35.01100,
         description: "בכניסה למתחם – במבנה שמימין."
     },
     {
         id: 6,
         name: "בית הכנסת",
-        lat: 32.35310,
-        lng: 34.90660,
+        lat: 32.33280,
+        lng: 35.01500,
         description: "החדר של הרב."
     },
     {
         id: 7,
         name: "ספריה",
-        lat: 32.35415,
-        lng: 34.90480,
+        lat: 32.33400,
+        lng: 35.01250,
         description: "בתוך המתחם, פתוח רק בשעות הפעילות."
     },
     {
         id: 8,
         name: "מועדון גימלאים",
-        lat: 32.35460,
-        lng: 34.90550,
+        lat: 32.33500,
+        lng: 35.01400,
         description: "בתוך המבנה, פתוח רק בשעות הפעילות."
     }
 ];
@@ -348,7 +386,7 @@ const SHELTERS = [
 // =============================================
 // Map Initialization
 // =============================================
-const BAT_HEFER_CENTER = [32.3540, 34.9050];
+const BAT_HEFER_CENTER = [32.3340, 35.0130];
 
 const map = L.map('map', {
     zoomControl: false
@@ -411,6 +449,7 @@ addShelterMarkers();
 let userMarker = null;
 let routeLine = null;
 let userLatLng = null;
+let watchId = null;
 
 function createUserIcon() {
     return L.divIcon({
@@ -505,9 +544,19 @@ function updateInfoPanel(shelter, distance) {
     `;
 }
 
+function showShelterList() {
+    panelContent.innerHTML = `
+        <h2>מקלטים ציבוריים בבת חפר</h2>
+        <div class="shelter-desc">
+            ${SHELTERS.map(s => `<strong>${s.name}</strong>: ${s.description}`).join('<br><br>')}
+        </div>
+    `;
+}
+
 function showError(msg) {
     panelContent.innerHTML = `<p class="error-msg">${msg}</p>`;
     statusText.textContent = 'מיקום לא זמין';
+    showShelterList();
 }
 
 // =============================================
@@ -542,31 +591,49 @@ function onLocationFound(position) {
 
 function onLocationError(error) {
     const messages = {
-        1: '🚫 לא ניתנה הרשאת מיקום. אנא אשרו גישה למיקום בהגדרות הדפדפן.',
-        2: '📡 מיקום לא זמין כרגע. נסו שוב מאוחר יותר.',
+        1: '🚫 לא ניתנה הרשאת מיקום. נסו לפתוח את הדף דרך HTTPS או אשרו גישה למיקום בהגדרות.',
+        2: '📡 מיקום לא זמין כרגע. נסו שוב.',
         3: '⏱️ תם הזמן לקבלת מיקום. נסו שוב.'
     };
     showError(messages[error.code] || 'שגיאה בקבלת מיקום.');
-
-    panelContent.innerHTML += `
-        <div style="margin-top: 12px;">
-            <h2>מקלטים ציבוריים בבת חפר</h2>
-            <div class="shelter-desc">
-                ${SHELTERS.map(s => `<strong>${s.name}</strong>: ${s.description}`).join('<br><br>')}
-            </div>
-        </div>
-    `;
 }
 
-if ('geolocation' in navigator) {
-    navigator.geolocation.watchPosition(onLocationFound, onLocationError, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
-    });
-} else {
-    showError('הדפדפן שלך לא תומך באיתור מיקום.');
+// User-triggered location request (better for insecure contexts / mobile)
+function requestLocation() {
+    if (!('geolocation' in navigator)) {
+        showError('הדפדפן שלך לא תומך באיתור מיקום.');
+        return;
+    }
+
+    statusText.textContent = '📍 מאתר מיקום...';
+
+    // First try getCurrentPosition (user-triggered = better permission chances)
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            onLocationFound(position);
+            // After first fix, start watching
+            if (!watchId) {
+                watchId = navigator.geolocation.watchPosition(onLocationFound, function() {}, {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 5000
+                });
+            }
+        },
+        onLocationError,
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        }
+    );
 }
+
+// Locate button click
+document.getElementById('locateBtn').addEventListener('click', requestLocation);
+
+// Also try automatic location on load
+requestLocation();
 </script>
 
 </body>
